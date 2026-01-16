@@ -1,0 +1,73 @@
+# FGN Savings Bond Application - Docker Ignore
+# Excludes unnecessary files from Docker build context
+
+# Git
+.git
+.gitignore
+
+# Python artifacts
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+ENV/
+.eggs/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# IDE and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Docker files (not needed inside container)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Documentation (not needed in runtime image)
+*.md
+docs/
+specs/
+CLAUDE.md
+
+# Development and environment files
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Generated files (should be created at runtime)
+*.pdf
+*.xlsx
+*.csv
+data/*.json
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+*.bak
+
+# Logs
+*.log
+logs/
+
+# Claude Code plans
+.claude/
+
+# Nginx (separate container)
+nginx/
+
+# GitHub workflows (not needed in container)
+.github/
+
+# Test files
+tests/
+*_test.py
+test_*.py

@@ -1,0 +1,33 @@
+# ==============================================================================
+# FGN Savings Bond Application - Python Dependencies
+# ==============================================================================
+#
+# Install: pip install -r requirements.txt
+#
+# ==============================================================================
+
+# Web Framework
+streamlit==1.42.0
+
+# Database
+pymongo==4.11.1
+
+# PDF Generation
+reportlab==4.3.1
+pillow==11.1.0
+
+# Data Processing
+pandas==2.2.3
+numpy==2.2.3
+
+# Excel Export
+openpyxl==3.1.5
+xlsxwriter==3.1.2
+
+# Visualization (Admin Dashboard)
+plotly==6.5.2
+
+# Utilities
+num2words==0.5.14
+python-dotenv==1.0.1
+pytz==2025.1
