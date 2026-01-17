@@ -142,7 +142,7 @@ describe('individualFieldsSchema', () => {
   });
 
   it('should require full name', () => {
-    const { full_name, ...dataWithoutName } = validData;
+    const { full_name: _full_name, ...dataWithoutName } = validData;
     const result = individualFieldsSchema.safeParse(dataWithoutName);
     expect(result.success).toBe(false);
   });
@@ -165,7 +165,7 @@ describe('jointApplicantFieldsSchema', () => {
   });
 
   it('should require joint full name', () => {
-    const { joint_full_name, ...dataWithoutName } = validData;
+    const { joint_full_name: _joint_full_name, ...dataWithoutName } = validData;
     const result = jointApplicantFieldsSchema.safeParse(dataWithoutName);
     expect(result.success).toBe(false);
   });
@@ -187,13 +187,13 @@ describe('corporateFieldsSchema', () => {
   });
 
   it('should require company name', () => {
-    const { company_name, ...dataWithoutName } = validData;
+    const { company_name: _company_name, ...dataWithoutName } = validData;
     const result = corporateFieldsSchema.safeParse(dataWithoutName);
     expect(result.success).toBe(false);
   });
 
   it('should require RC number', () => {
-    const { rc_number, ...dataWithoutRc } = validData;
+    const { rc_number: _rc_number, ...dataWithoutRc } = validData;
     const result = corporateFieldsSchema.safeParse(dataWithoutRc);
     expect(result.success).toBe(false);
   });

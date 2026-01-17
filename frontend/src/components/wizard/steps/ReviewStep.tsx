@@ -6,10 +6,53 @@ import type { UseFormReturn } from 'react-hook-form';
 import type { ApplicationFormData } from '../../../types/application';
 import { formatCurrency, formatMoneyInWords } from '../../../lib/utils';
 import { Checkbox } from '../../ui';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 interface ReviewStepProps {
   form: UseFormReturn<ApplicationFormData>;
+}
+
+interface SectionProps {
+  title: string;
+  children: ReactNode;
+}
+
+interface FieldProps {
+  label: string;
+  value?: string | number | boolean | null;
+}
+
+// Section component - moved outside to avoid recreation on each render
+function Section({ title, children }: SectionProps) {
+  return (
+    <div className="card mb-4">
+      <h3 className="text-lg font-semibold text-primary-500 border-b border-dark-border pb-2 mb-4">
+        {title}
+      </h3>
+      {children}
+    </div>
+  );
+}
+
+// Field component - moved outside to avoid recreation on each render
+function Field({ label, value }: FieldProps) {
+  if (value === undefined || value === null || value === '') return null;
+
+  let displayValue: string;
+  if (typeof value === 'boolean') {
+    displayValue = value ? 'Yes' : 'No';
+  } else if (Array.isArray(value)) {
+    displayValue = value.join(', ');
+  } else {
+    displayValue = String(value);
+  }
+
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-start gap-1 py-2 border-b border-dark-border/50 last:border-0">
+      <span className="text-sm text-dark-text-secondary sm:w-1/3">{label}:</span>
+      <span className="text-sm text-dark-text font-medium sm:w-2/3">{displayValue}</span>
+    </div>
+  );
 }
 
 export function ReviewStep({ form }: ReviewStepProps) {
@@ -18,42 +61,6 @@ export function ReviewStep({ form }: ReviewStepProps) {
   const [declarationAccepted, setDeclarationAccepted] = useState(false);
 
   const applicantType = data.applicant_type;
-
-  // Section component for displaying review data
-  const Section = ({
-    title,
-    children,
-  }: {
-    title: string;
-    children: React.ReactNode;
-  }) => (
-    <div className="card mb-4">
-      <h3 className="text-lg font-semibold text-primary-500 border-b border-dark-border pb-2 mb-4">
-        {title}
-      </h3>
-      {children}
-    </div>
-  );
-
-  const Field = ({ label, value }: { label: string; value?: string | number | boolean | null }) => {
-    if (value === undefined || value === null || value === '') return null;
-
-    let displayValue: string;
-    if (typeof value === 'boolean') {
-      displayValue = value ? 'Yes' : 'No';
-    } else if (Array.isArray(value)) {
-      displayValue = value.join(', ');
-    } else {
-      displayValue = String(value);
-    }
-
-    return (
-      <div className="flex flex-col sm:flex-row sm:items-start gap-1 py-2 border-b border-dark-border/50 last:border-0">
-        <span className="text-sm text-dark-text-secondary sm:w-1/3">{label}:</span>
-        <span className="text-sm text-dark-text font-medium sm:w-2/3">{displayValue}</span>
-      </div>
-    );
-  };
 
   return (
     <div className="space-y-6">

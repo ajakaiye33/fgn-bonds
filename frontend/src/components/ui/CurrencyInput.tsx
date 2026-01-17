@@ -2,7 +2,7 @@
  * Currency input with Naira formatting.
  */
 
-import { forwardRef, useState, useEffect, type ChangeEvent } from 'react';
+import { forwardRef, useState, type ChangeEvent } from 'react';
 import { cn, formatCurrency } from '../../lib/utils';
 
 export interface CurrencyInputProps {
@@ -39,32 +39,28 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
     ref
   ) => {
     const inputId = id || name;
-    const [displayValue, setDisplayValue] = useState('');
     const [isFocused, setIsFocused] = useState(false);
+    const [editingValue, setEditingValue] = useState('');
 
-    useEffect(() => {
-      if (!isFocused && value !== undefined) {
-        setDisplayValue(formatCurrency(value));
-      }
-    }, [value, isFocused]);
+    // Compute display value: when focused show raw editing value, otherwise show formatted
+    const displayValue = isFocused
+      ? editingValue
+      : value !== undefined
+        ? formatCurrency(value)
+        : '';
 
     const handleFocus = () => {
       setIsFocused(true);
-      if (value !== undefined) {
-        setDisplayValue(value.toString());
-      }
+      setEditingValue(value !== undefined ? value.toString() : '');
     };
 
     const handleBlur = () => {
       setIsFocused(false);
-      if (value !== undefined) {
-        setDisplayValue(formatCurrency(value));
-      }
     };
 
     const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
       const rawValue = e.target.value.replace(/[^0-9]/g, '');
-      setDisplayValue(rawValue);
+      setEditingValue(rawValue);
 
       const numericValue = parseInt(rawValue, 10);
       if (!isNaN(numericValue)) {

@@ -2,7 +2,7 @@
  * Step 3: Applicant Information - Enter personal/company details.
  */
 
-import { Controller, type UseFormReturn } from 'react-hook-form';
+import { Controller, type UseFormReturn, type Control, type FieldErrors, type UseFormRegister } from 'react-hook-form';
 import type { ApplicationFormData } from '../../../types/application';
 import { Input, Select, Textarea } from '../../ui';
 import { TITLES } from '../../../lib/constants';
@@ -11,164 +11,168 @@ interface ApplicantInfoStepProps {
   form: UseFormReturn<ApplicationFormData>;
 }
 
-export function ApplicantInfoStep({ form }: ApplicantInfoStepProps) {
-  const {
-    register,
-    control,
-    watch,
-    formState: { errors },
-  } = form;
+interface IndividualFormProps {
+  prefix?: string;
+  label?: string;
+  control: Control<ApplicationFormData>;
+  register: UseFormRegister<ApplicationFormData>;
+  errors: FieldErrors<ApplicationFormData>;
+}
 
-  const applicantType = watch('applicant_type');
+interface CorporateFormProps {
+  register: UseFormRegister<ApplicationFormData>;
+  errors: FieldErrors<ApplicationFormData>;
+}
 
-  // Individual or Joint applicant form
-  const IndividualForm = ({ prefix = '', label = '' }: { prefix?: string; label?: string }) => {
-    const p = prefix ? `${prefix}_` : '';
-    const getFieldName = (field: string) => `${p}${field}` as keyof ApplicationFormData;
+// Individual or Joint applicant form - moved outside to avoid recreation on each render
+function IndividualForm({ prefix = '', label = '', control, register, errors }: IndividualFormProps) {
+  const p = prefix ? `${prefix}_` : '';
+  const getFieldName = (field: string) => `${p}${field}` as keyof ApplicationFormData;
 
-    return (
-      <div className="space-y-4">
-        {label && (
-          <h3 className="text-lg font-semibold text-primary-500 border-b border-dark-border pb-2">
-            {label}
-          </h3>
-        )}
+  return (
+    <div className="space-y-4">
+      {label && (
+        <h3 className="text-lg font-semibold text-primary-500 border-b border-dark-border pb-2">
+          {label}
+        </h3>
+      )}
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Title */}
-          <Controller
-            name={getFieldName('title')}
-            control={control}
-            render={({ field }) => (
-              <Select
-                label="Title"
-                placeholder="Select"
-                options={TITLES}
-                required
-                {...field}
-                value={field.value as string || ''}
-                error={(errors as Record<string, {message?: string}>)[getFieldName('title')]?.message}
-              />
-            )}
-          />
-
-          {/* Full Name */}
-          <div className="md:col-span-3">
-            <Input
-              label="Full Name (as it appears on official documents)"
-              placeholder="Enter full name"
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Title */}
+        <Controller
+          name={getFieldName('title')}
+          control={control}
+          render={({ field }) => (
+            <Select
+              label="Title"
+              placeholder="Select"
+              options={TITLES}
               required
-              {...register(getFieldName('full_name'))}
-              error={(errors as Record<string, {message?: string}>)[getFieldName('full_name')]?.message}
+              {...field}
+              value={field.value as string || ''}
+              error={(errors as Record<string, {message?: string}>)[getFieldName('title')]?.message}
             />
-          </div>
-        </div>
+          )}
+        />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Date of Birth */}
+        {/* Full Name */}
+        <div className="md:col-span-3">
           <Input
-            type="date"
-            label="Date of Birth"
+            label="Full Name (as it appears on official documents)"
+            placeholder="Enter full name"
             required
-            {...register(getFieldName('date_of_birth'))}
-            error={(errors as Record<string, {message?: string}>)[getFieldName('date_of_birth')]?.message}
-          />
-
-          {/* Phone Number */}
-          <Input
-            label="Phone Number"
-            placeholder="e.g., 08012345678"
-            required
-            {...register(getFieldName('phone_number'))}
-            error={(errors as Record<string, {message?: string}>)[getFieldName('phone_number')]?.message}
-            hint="Nigerian format: 080XXXXXXXX"
+            {...register(getFieldName('full_name'))}
+            error={(errors as Record<string, {message?: string}>)[getFieldName('full_name')]?.message}
           />
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Email */}
-          <Input
-            type="email"
-            label="Email Address"
-            placeholder="email@example.com"
-            required
-            {...register(getFieldName('email'))}
-            error={(errors as Record<string, {message?: string}>)[getFieldName('email')]?.message}
-          />
-
-          {/* Occupation */}
-          <Input
-            label="Occupation"
-            placeholder="Enter occupation"
-            {...register(getFieldName('occupation'))}
-            error={(errors as Record<string, {message?: string}>)[getFieldName('occupation')]?.message}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Passport/ID Number */}
-          <Input
-            label="Passport/ID Number"
-            placeholder="Enter passport or ID number"
-            {...register(getFieldName('passport_no'))}
-            error={(errors as Record<string, {message?: string}>)[getFieldName('passport_no')]?.message}
-          />
-
-          {/* Next of Kin */}
-          <Input
-            label="Next of Kin"
-            placeholder="Enter next of kin name"
-            required
-            {...register(getFieldName('next_of_kin'))}
-            error={(errors as Record<string, {message?: string}>)[getFieldName('next_of_kin')]?.message}
-          />
-        </div>
-
-        {/* Only show for primary applicant */}
-        {!prefix && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Mother's Maiden Name */}
-            <Input
-              label="Mother's Maiden Name"
-              placeholder="Enter mother's maiden name"
-              {...register('mothers_maiden_name')}
-              error={errors.mothers_maiden_name?.message}
-            />
-
-            {/* CSCS Number */}
-            <Input
-              label="CSCS Number"
-              placeholder="Enter CSCS number (if available)"
-              {...register('cscs_number')}
-              error={errors.cscs_number?.message}
-            />
-          </div>
-        )}
-
-        {/* CHN Number (only for primary) */}
-        {!prefix && (
-          <Input
-            label="CHN Number"
-            placeholder="Enter CHN number (if available)"
-            {...register('chn_number')}
-            error={errors.chn_number?.message}
-          />
-        )}
-
-        {/* Address */}
-        <Textarea
-          label="Residential Address"
-          placeholder="Enter full residential address"
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Date of Birth */}
+        <Input
+          type="date"
+          label="Date of Birth"
           required
-          {...register(getFieldName('address'))}
-          error={(errors as Record<string, {message?: string}>)[getFieldName('address')]?.message}
+          {...register(getFieldName('date_of_birth'))}
+          error={(errors as Record<string, {message?: string}>)[getFieldName('date_of_birth')]?.message}
+        />
+
+        {/* Phone Number */}
+        <Input
+          label="Phone Number"
+          placeholder="e.g., 08012345678"
+          required
+          {...register(getFieldName('phone_number'))}
+          error={(errors as Record<string, {message?: string}>)[getFieldName('phone_number')]?.message}
+          hint="Nigerian format: 080XXXXXXXX"
         />
       </div>
-    );
-  };
 
-  // Corporate applicant form
-  const CorporateForm = () => (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Email */}
+        <Input
+          type="email"
+          label="Email Address"
+          placeholder="email@example.com"
+          required
+          {...register(getFieldName('email'))}
+          error={(errors as Record<string, {message?: string}>)[getFieldName('email')]?.message}
+        />
+
+        {/* Occupation */}
+        <Input
+          label="Occupation"
+          placeholder="Enter occupation"
+          {...register(getFieldName('occupation'))}
+          error={(errors as Record<string, {message?: string}>)[getFieldName('occupation')]?.message}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Passport/ID Number */}
+        <Input
+          label="Passport/ID Number"
+          placeholder="Enter passport or ID number"
+          {...register(getFieldName('passport_no'))}
+          error={(errors as Record<string, {message?: string}>)[getFieldName('passport_no')]?.message}
+        />
+
+        {/* Next of Kin */}
+        <Input
+          label="Next of Kin"
+          placeholder="Enter next of kin name"
+          required
+          {...register(getFieldName('next_of_kin'))}
+          error={(errors as Record<string, {message?: string}>)[getFieldName('next_of_kin')]?.message}
+        />
+      </div>
+
+      {/* Only show for primary applicant */}
+      {!prefix && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Mother's Maiden Name */}
+          <Input
+            label="Mother's Maiden Name"
+            placeholder="Enter mother's maiden name"
+            {...register('mothers_maiden_name')}
+            error={errors.mothers_maiden_name?.message}
+          />
+
+          {/* CSCS Number */}
+          <Input
+            label="CSCS Number"
+            placeholder="Enter CSCS number (if available)"
+            {...register('cscs_number')}
+            error={errors.cscs_number?.message}
+          />
+        </div>
+      )}
+
+      {/* CHN Number (only for primary) */}
+      {!prefix && (
+        <Input
+          label="CHN Number"
+          placeholder="Enter CHN number (if available)"
+          {...register('chn_number')}
+          error={errors.chn_number?.message}
+        />
+      )}
+
+      {/* Address */}
+      <Textarea
+        label="Residential Address"
+        placeholder="Enter full residential address"
+        required
+        {...register(getFieldName('address'))}
+        error={(errors as Record<string, {message?: string}>)[getFieldName('address')]?.message}
+      />
+    </div>
+  );
+}
+
+// Corporate applicant form - moved outside to avoid recreation on each render
+function CorporateForm({ register, errors }: CorporateFormProps) {
+  return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Company Name */}
@@ -241,6 +245,17 @@ export function ApplicantInfoStep({ form }: ApplicantInfoStepProps) {
       />
     </div>
   );
+}
+
+export function ApplicantInfoStep({ form }: ApplicantInfoStepProps) {
+  const {
+    register,
+    control,
+    watch,
+    formState: { errors },
+  } = form;
+
+  const applicantType = watch('applicant_type');
 
   return (
     <div className="space-y-6">
@@ -258,14 +273,14 @@ export function ApplicantInfoStep({ form }: ApplicantInfoStepProps) {
       </div>
 
       {applicantType === 'Corporate' ? (
-        <CorporateForm />
+        <CorporateForm register={register} errors={errors} />
       ) : applicantType === 'Joint' ? (
         <>
-          <IndividualForm label="Primary Applicant" />
-          <IndividualForm prefix="joint" label="Joint Applicant" />
+          <IndividualForm label="Primary Applicant" control={control} register={register} errors={errors} />
+          <IndividualForm prefix="joint" label="Joint Applicant" control={control} register={register} errors={errors} />
         </>
       ) : (
-        <IndividualForm />
+        <IndividualForm control={control} register={register} errors={errors} />
       )}
     </div>
   );

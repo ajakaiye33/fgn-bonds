@@ -58,7 +58,8 @@ export function FormWizard({ onSuccess }: FormWizardProps) {
       case 1: // Applicant Type
         fieldsToValidate = ['applicant_type'];
         break;
-      case 2: // Applicant Info
+      case 2: {
+        // Applicant Info
         const applicantType = form.getValues('applicant_type');
         if (applicantType === 'Individual') {
           fieldsToValidate = [
@@ -79,6 +80,7 @@ export function FormWizard({ onSuccess }: FormWizardProps) {
           ];
         }
         break;
+      }
       case 3: // Bank Details
         fieldsToValidate = ['bank_name', 'account_number'];
         if (form.getValues('applicant_type') === 'Joint') {

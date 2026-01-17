@@ -2,28 +2,18 @@
 # FGN Savings Bond Frontend - Multi-Stage Dockerfile
 # =============================================================================
 # Stages:
-#   - deps:       Install dependencies (shared)
 #   - test:       Run tests, linting (has Node.js)
 #   - build:      Build production assets
 #   - production: Serve with nginx (no Node.js)
+#
+# Note: We only copy package.json (not lock file) due to npm bug with optional
+# dependencies (https://github.com/npm/cli/issues/4828). The lock file generated
+# on macOS won't include linux-arm64-musl variants needed for Docker builds.
 #
 # Usage:
 #   Production:  docker build -t frontend .
 #   Test:        docker build --target test -t frontend-test .
 # =============================================================================
-
-# -----------------------------------------------------------------------------
-# Dependencies stage (shared base for test and build)
-# -----------------------------------------------------------------------------
-FROM node:20-alpine AS deps
-
-WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-
-# Install dependencies
-RUN npm ci
 
 # -----------------------------------------------------------------------------
 # Test stage (has Node.js - can run tests, lint, type-check)
@@ -32,11 +22,11 @@ FROM node:20-alpine AS test
 
 WORKDIR /app
 
-# Copy only package.json (not lock file) to ensure correct platform binaries
-# This is necessary due to npm bug with optional deps: https://github.com/npm/cli/issues/4828
+# Copy only package.json (not lock file) to resolve platform-specific binaries
 # The lock file may not include linux-arm64-musl variants if generated on macOS
+# See: https://github.com/npm/cli/issues/4828
 COPY package.json ./
-RUN npm install
+RUN npm install --loglevel error
 
 # Copy source code
 COPY . .
@@ -47,9 +37,15 @@ CMD ["npm", "run", "test:run"]
 # -----------------------------------------------------------------------------
 # Build stage (compile TypeScript, bundle assets)
 # -----------------------------------------------------------------------------
-FROM deps AS build
+FROM node:20-alpine AS build
 
 WORKDIR /app
+
+# Copy only package.json (not lock file) to resolve platform-specific binaries
+# The lock file may not include linux-arm64-musl variants if generated on macOS
+# See: https://github.com/npm/cli/issues/4828
+COPY package.json ./
+RUN npm install --loglevel error
 
 # Copy source code
 COPY . .
