@@ -1,7 +1,7 @@
-# FGN Savings Bond Application - CI/CD Pipeline
-# Runs on push to main/develop and on pull requests
+# FGN Savings Bond Application - CI Pipeline
+# Runs tests, quality checks, and code formatting validation
 
-name: CI/CD Pipeline
+name: CI
 
 on:
   push:
@@ -9,16 +9,17 @@ on:
   pull_request:
     branches: [main]
 
-env:
-  REGISTRY: docker.io
-  IMAGE_NAME: fgn-bond-app
-
 jobs:
   # ==========================================================================
-  # Lint and validate Python code
+  # Backend: Python/FastAPI - Lint, Format, Test
   # ==========================================================================
-  lint:
+  backend:
+    name: Backend (Python)
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,123 +27,119 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.12'
           cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Install linting tools
-        run: pip install flake8
-
-      - name: Run flake8 (syntax errors and undefined names)
         run: |
-          flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install flake8 black isort
 
-      - name: Run flake8 (style guide)
-        run: |
-          flake8 src/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      - name: Check code formatting (Black)
+        run: black --check --diff app/ || echo "Run 'black app/' to fix formatting"
         continue-on-error: true
 
+      - name: Check import sorting (isort)
+        run: isort --check-only --diff --profile black app/ || echo "Run 'isort app/' to fix imports"
+        continue-on-error: true
+
+      - name: Lint with flake8
+        run: |
+          # Stop build on syntax errors or undefined names
+          flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Style warnings (non-blocking)
+          flake8 app/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Run tests
+        run: pytest tests/ -v --cov=app --cov-report=term-missing --cov-report=xml
+        env:
+          DATABASE_URL: "sqlite:///:memory:"
+          ADMIN_USERNAME: "testadmin"
+          ADMIN_PASSWORD_HASH: "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.5iwEQYsZOxL2G"
+          JWT_SECRET_KEY: "test-secret-key"
+
   # ==========================================================================
-  # Build and test Docker image
+  # Frontend: React/TypeScript - Lint, Format, Type Check, Test
   # ==========================================================================
-  build:
+  frontend:
+    name: Frontend (React)
     runs-on: ubuntu-latest
-    needs: lint
+    defaults:
+      run:
+        working-directory: frontend
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Docker image
-        uses: docker/build-push-action@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          context: .
-          push: false
-          load: true
-          tags: ${{ env.IMAGE_NAME }}:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
-      - name: Test Docker image starts correctly
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check code formatting (Prettier)
+        run: npm run format:check || echo "Run 'npm run format' to fix formatting"
+        continue-on-error: true
+
+      - name: Lint with ESLint
+        run: npm run lint
+
+      - name: Type check (TypeScript)
+        run: npx tsc --noEmit
+
+      - name: Run tests
+        run: npm run test:run
+
+      - name: Build
+        run: npm run build
+
+  # ==========================================================================
+  # Docker Compose validation
+  # ==========================================================================
+  docker:
+    name: Docker Validation
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate docker-compose.yml
+        run: docker-compose config -q
+
+      - name: Build production images
+        run: docker-compose build
+
+      - name: Build test images
+        run: docker-compose --profile test build
+
+      - name: Run backend tests (Docker)
+        run: docker-compose run --rm backend pytest tests/ -v
+
+      - name: Run frontend tests (Docker)
+        run: docker-compose --profile test run --rm frontend-test
+
+      - name: Start production services
         run: |
-          # Start container
-          docker run -d --name test-app -p 8501:8501 ${{ env.IMAGE_NAME }}:test
-
-          # Wait for Streamlit to start
-          echo "Waiting for application to start..."
+          docker-compose up -d
           sleep 15
 
-          # Check health endpoint
-          curl --fail --retry 5 --retry-delay 3 http://localhost:8501/_stcore/health || exit 1
-
-          # Cleanup
-          docker stop test-app
-          docker rm test-app
-
-      - name: Run Docker Compose validation
+      - name: Health check
         run: |
-          docker-compose config -q
-          docker-compose -f docker-compose.prod.yml config -q
+          # Check backend API
+          curl --fail --retry 5 --retry-delay 3 http://localhost:8000/api/constants || exit 1
+          echo "Backend API is healthy"
+          # Check frontend
+          curl --fail --retry 3 --retry-delay 2 http://localhost:3000/ || exit 1
+          echo "Frontend is healthy"
 
-  # ==========================================================================
-  # Push to Docker Hub (only on main branch)
-  # ==========================================================================
-  push:
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=latest
-            type=sha,prefix=
-            type=raw,value={{date 'YYYYMMDD'}}
-
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  # ==========================================================================
-  # Security scan (optional - runs on main only)
-  # ==========================================================================
-  security-scan:
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          severity: 'CRITICAL,HIGH'
-          exit-code: '0'  # Don't fail build, just report
+      - name: Stop services
+        run: docker-compose down

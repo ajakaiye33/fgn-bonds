@@ -8,21 +8,18 @@ This document provides a comprehensive security checklist for deploying the FGN 
 
 ### Credentials & Secrets
 
-- [ ] **MongoDB Password Changed**
-  - Update `MONGO_INITDB_ROOT_PASSWORD` in `.env`
-  - Use strong password: `openssl rand -base64 32`
-
 - [ ] **Admin Password Changed**
-  - Generate new hash for `ADMIN_PASSWORD_HASH`
+  - Generate new bcrypt hash for `ADMIN_PASSWORD_HASH`
   - Use password with 12+ characters, mixed case, numbers, symbols
-  - Command: `echo -n "YourPassword" | shasum -a 256 | cut -d' ' -f1`
+  - Command: `python -c "import bcrypt; print(bcrypt.hashpw('YourPassword'.encode(), bcrypt.gensalt()).decode())"`
 
-- [ ] **Secret Key Generated**
-  - Update `SECRET_KEY` in `.env`
+- [ ] **JWT Secret Generated**
+  - Update `JWT_SECRET_KEY` in `backend/.env`
   - Generate with: `python -c "import secrets; print(secrets.token_hex(32))"`
 
 - [ ] **Default Credentials Removed**
   - Verify no default passwords remain (`admin123`, `password`, etc.)
+  - Change default admin username if needed
 
 ### Environment Configuration
 
@@ -32,11 +29,11 @@ This document provides a comprehensive security checklist for deploying the FGN 
   ```
 
 - [ ] **Debug Mode Disabled**
-  - Verify no debug flags are enabled
-  - Check Streamlit config for production settings
+  - Verify no debug flags are enabled in FastAPI
+  - Remove `--reload` from production uvicorn command
 
 - [ ] **.env Not in Version Control**
-  - Confirm `.env` is in `.gitignore`
+  - Confirm `backend/.env` is in `.gitignore`
   - Use secrets management for CI/CD
 
 ---
@@ -46,20 +43,23 @@ This document provides a comprehensive security checklist for deploying the FGN 
 ### Firewall Configuration
 
 - [ ] **Required Ports Only**
-  - Port 80 (HTTP) - if using Nginx
+  - Port 80 (HTTP) - for Nginx
   - Port 443 (HTTPS) - for SSL
-  - Port 8080 - Admin (consider restricting to internal network)
+  - Internal only: 8000 (backend), 3000 (frontend)
 
-- [ ] **MongoDB Not Publicly Exposed**
-  - In `docker-compose.prod.yml`, MongoDB uses `expose` not `ports`
-  - Database accessible only within Docker network
+- [ ] **Database Not Publicly Exposed**
+  - SQLite database stored inside container
+  - No external database ports exposed
 
 - [ ] **Admin Dashboard Protected**
   - Consider IP whitelisting in `nginx/nginx.conf`:
     ```nginx
-    allow 192.168.1.0/24;
-    allow 10.0.0.0/8;
-    deny all;
+    location /admin {
+        allow 192.168.1.0/24;
+        allow 10.0.0.0/8;
+        deny all;
+        # ... rest of config
+    }
     ```
   - Or use VPN for admin access
 
@@ -67,12 +67,15 @@ This document provides a comprehensive security checklist for deploying the FGN 
 
 - [ ] **HTTPS Enabled**
   - Obtain SSL certificate (Let's Encrypt, commercial CA)
-  - Place certificates in `nginx/certs/`
+  - Configure in nginx
 
 - [ ] **HTTP to HTTPS Redirect**
-  - Uncomment redirect in `nginx/nginx.conf`:
+  - Add redirect in `nginx/nginx.conf`:
     ```nginx
-    return 301 https://$server_name$request_uri;
+    server {
+        listen 80;
+        return 301 https://$server_name$request_uri;
+    }
     ```
 
 - [ ] **Strong TLS Configuration**
@@ -87,16 +90,16 @@ This document provides a comprehensive security checklist for deploying the FGN 
 ### Docker Configuration
 
 - [ ] **Non-Root User**
-  - Dockerfile uses `USER appuser` (already configured)
-  - Verify: `docker exec <container> whoami` should show `appuser`
+  - Backend Dockerfile uses non-root user
+  - Verify: `docker exec <container> whoami`
 
 - [ ] **Resource Limits Set**
-  - Memory and CPU limits in `docker-compose.prod.yml`
+  - Memory and CPU limits in `docker-compose.yml`
   - Prevents resource exhaustion attacks
 
 - [ ] **Read-Only Volumes Where Possible**
-  - Nginx config mounted as `:ro`
-  - Application data volumes are writable only where needed
+  - Nginx config mounted as read-only
+  - Only data directories are writable
 
 - [ ] **No Privileged Containers**
   - Verify no `privileged: true` in compose files
@@ -110,11 +113,25 @@ This document provides a comprehensive security checklist for deploying the FGN 
 - [ ] **Vulnerability Scan Passed**
   - Run Trivy or similar scanner
   - Address critical/high vulnerabilities
-  - Command: `trivy image fgn-bond-app:latest`
+  - Command: `trivy image fgn-bond-backend:latest`
 
 ---
 
 ## Application Security
+
+### API Security
+
+- [ ] **JWT Authentication Active**
+  - Admin endpoints require valid JWT
+  - Token expiration configured appropriately
+
+- [ ] **CORS Configured**
+  - `CORS_ORIGINS` in `.env` limits allowed origins
+  - Only allow your frontend domain in production
+
+- [ ] **Rate Limiting**
+  - Consider adding rate limiting to sensitive endpoints
+  - Nginx or FastAPI middleware
 
 ### Input Validation
 
@@ -122,45 +139,41 @@ This document provides a comprehensive security checklist for deploying the FGN 
   - BVN validation (11 digits)
   - Email format validation
   - Phone number validation
-  - Currency amount validation
+  - Currency amount validation (Pydantic schemas)
 
 - [ ] **File Upload Restrictions**
-  - Max upload size configured in Streamlit
-  - Allowed file types restricted
+  - Max upload size: 5MB
+  - Allowed file types: PDF, JPG, PNG only
+  - Files stored outside web root
 
 ### Session Management
 
-- [ ] **CSRF Protection Enabled**
-  - Streamlit XSRF protection: `enableXsrfProtection = true`
-
 - [ ] **Secure Cookies**
-  - In production, cookies should be:
-    - `HttpOnly`
-    - `Secure` (HTTPS only)
-    - `SameSite=Strict`
+  - JWT stored in localStorage (ensure XSS protection)
+  - Consider httpOnly cookies for production
+
+- [ ] **Token Expiration**
+  - Access tokens expire appropriately
+  - Logout clears tokens from client
 
 ---
 
 ## Database Security
 
-### MongoDB Hardening
+### SQLite Hardening
 
-- [ ] **Authentication Enabled**
-  - Root user configured with strong password
-  - Application uses authenticated connection
+- [ ] **Database File Protected**
+  - File permissions restricted (chmod 600)
+  - Located in non-public directory
 
-- [ ] **Authorization Configured**
-  - Application user has minimal required permissions
-  - Consider separate read-only user for reporting
-
-- [ ] **Network Binding**
-  - MongoDB binds to internal Docker network only
-  - Not accessible from host or external networks
+- [ ] **Regular Backups**
+  - Automated daily backups
+  - Backups stored securely (encrypted)
 
 ### Data Protection
 
 - [ ] **Sensitive Data Handling**
-  - PII (names, BVN, addresses) stored securely
+  - PII (names, BVN, addresses) stored in database
   - Consider field-level encryption for sensitive data
 
 - [ ] **Backup Encryption**
@@ -184,7 +197,7 @@ This document provides a comprehensive security checklist for deploying the FGN 
 ### Monitoring Setup
 
 - [ ] **Health Checks Active**
-  - All services have health checks
+  - API health endpoint: `/api/health`
   - Monitoring system alerts on failures
 
 - [ ] **Resource Monitoring**
@@ -233,6 +246,7 @@ This document provides a comprehensive security checklist for deploying the FGN 
 
 - [ ] **Dependency Updates**
   - Regular `pip` updates for security patches
+  - Regular `npm` updates for frontend
   - Test updates in staging before production
 
 - [ ] **Docker Image Updates**
@@ -258,6 +272,7 @@ This document provides a comprehensive security checklist for deploying the FGN 
 - [ ] **Action Logging**
   - Admin actions logged
   - Application submissions tracked
+  - Payment changes recorded
 
 ---
 
@@ -265,20 +280,26 @@ This document provides a comprehensive security checklist for deploying the FGN 
 
 ```bash
 # Check container user
-docker exec fgnbond_sub-web-1 whoami
+docker exec fgnbond_sub-backend-1 whoami
 
 # Scan image for vulnerabilities
 docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-  aquasec/trivy image fgn-bond-app:latest
+  aquasec/trivy image fgn-bond-backend:latest
 
-# Check MongoDB is not exposed
-netstat -tlnp | grep 27017  # Should show nothing on public interfaces
+# Check API health
+curl http://localhost/api/health
 
-# Test HTTPS redirect
+# Test HTTPS redirect (if configured)
 curl -I http://yourdomain.com  # Should return 301 to HTTPS
 
-# Verify health endpoints
-curl -f http://localhost/_stcore/health
+# View backend logs
+docker-compose logs -f backend
+
+# Check database file permissions
+docker exec fgnbond_sub-backend-1 ls -la /app/data/
+
+# View failed login attempts in logs
+docker-compose logs backend | grep -i "login failed"
 ```
 
 ---

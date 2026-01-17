@@ -1,0 +1,21 @@
+# Dependencies (installed fresh in container with correct platform binaries)
+node_modules
+
+# Build output
+dist
+
+# Development files
+.git
+.gitignore
+*.md
+.env*
+.vscode
+.idea
+
+# Test artifacts
+coverage
+.nyc_output
+
+# OS files
+.DS_Store
+Thumbs.db

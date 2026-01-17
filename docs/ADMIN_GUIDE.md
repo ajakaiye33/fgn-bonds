@@ -1,6 +1,6 @@
 # Admin Dashboard User Guide
 
-This guide covers the FGN Savings Bond Application admin dashboard, used for viewing applications, generating reports, and exporting data.
+This guide covers the FGN Savings Bond Application admin dashboard, used for viewing applications, managing payments, generating DMO reports, and exporting data.
 
 ---
 
@@ -10,169 +10,203 @@ This guide covers the FGN Savings Bond Application admin dashboard, used for vie
 
 | Environment | URL |
 |-------------|-----|
-| Docker (via Nginx) | http://localhost:8080 |
-| Docker (direct) | http://localhost:8502 |
-| Production | https://admin.yourdomain.com |
+| Docker | http://localhost/admin |
+| Local Development | http://localhost:5173/admin |
+| Production | https://yourdomain.com/admin |
 
 ### Login
 
 1. Navigate to the admin dashboard URL
 2. Enter your credentials:
    - **Username:** As configured in `ADMIN_USERNAME` (default: `admin`)
-   - **Password:** Plain text password (will be hashed and compared)
+   - **Password:** Plain text password (default: `admin123`)
 
-> **Note:** If login fails, verify your `ADMIN_PASSWORD_HASH` in `.env` matches your password. See [Generating Password Hash](#generating-password-hash).
+> **WARNING:** Change default credentials before production deployment!
 
 ---
 
 ## Dashboard Overview
 
-The admin dashboard provides three main sections:
+The admin dashboard has three main tabs:
 
-### 1. Applications Tab
+### 1. Overview Tab
+
+Dashboard metrics with visual analytics.
+
+**Key Metrics:**
+- Total applications count
+- Total subscription value
+- Average subscription value
+- Applications this month
+
+**Charts:**
+- Applications by type (Individual, Joint, Corporate)
+- Applications by tenor (2-Year vs 3-Year)
+- Monthly trends over time
+
+### 2. Applications Tab
 
 View and manage all submitted bond applications.
 
 **Features:**
 - **Search & Filter**
-  - Filter by date range
-  - Filter by applicant type (Individual, Joint, Corporate)
-  - Filter by status
+  - Filter by date range (from/to)
+  - Filter by subscription value range (min/max)
+  - Filter by tenor (2-Year, 3-Year)
+  - Filter by payment status (Pending, Paid, Verified, Rejected)
   - Search by applicant name or reference
 
 - **Application List**
   - Sortable columns
-  - Pagination for large datasets
-  - Click row to view full details
+  - Click row to view full details and manage payments
+  - Payment status badges (color-coded)
 
-- **Application Details**
-  - Personal information
-  - Bond details (amount, tenor)
-  - Bank information
-  - Submission timestamp
+- **Export Options**
+  - Export to CSV
+  - Export to Excel (with summary sheet)
 
-### 2. Analytics Tab
+### 3. DMO Reports Tab
 
-Visual insights into application data.
+Generate monthly reports for submission to the Debt Management Office.
 
-**Charts & Metrics:**
-- **Application Trends**
-  - Daily/weekly/monthly submission counts
-  - 7-day moving average trend line
+**Features:**
+- **Monthly Summary**
+  - Select month and year
+  - View total applications and value
+  - Breakdown by tenor and applicant type
+  - Payment status overview
 
-- **Bond Value Distribution**
-  - Breakdown by amount ranges
-  - Pie chart by applicant type
+- **Export DMO Report**
+  - Generate Excel report with detailed subscriber list
+  - Format ready for DMO submission
 
-- **Growth Metrics**
-  - Week-over-week comparison
-  - Month-over-month growth rate
-
-- **Top Applicants**
-  - Highest value applications
-  - Most frequent applicants (corporate)
-
-### 3. Reports Tab
-
-Generate and export reports.
-
-**Report Types:**
-- Monthly subscription summary
-- Custom date range reports
-- Applicant type breakdown
+- **Submission Tracking**
+  - Mark reports as submitted to DMO
+  - View submission history with timestamps
 
 ---
 
-## Common Tasks
+## Payment Management
 
-### Viewing Application Details
+### Payment Workflow
+
+```
+Application Submitted
+         │
+         ▼
+    ┌─────────┐
+    │ Pending │ ← No payment recorded
+    └────┬────┘
+         │ Record Payment
+         ▼
+    ┌─────────┐
+    │  Paid   │ ← Payment recorded, awaiting verification
+    └────┬────┘
+         │
+    ┌────┴────┐
+    │         │
+    ▼         ▼
+┌────────┐ ┌──────────┐
+│Verified│ │ Rejected │
+└────────┘ └──────────┘
+```
+
+### Recording a Payment
 
 1. Go to **Applications** tab
-2. Use filters to narrow down results (optional)
-3. Click on any row to expand details
-4. View complete application information
+2. Click on an application row to open details
+3. Scroll to **Payment Information** section
+4. Click **Record Payment**
+5. Fill in payment details:
+   - **Amount** (in Naira)
+   - **Payment Method** (Bank Transfer, Cash, etc.)
+   - **Reference Number** (bank reference or transaction ID)
+   - **Payment Date**
+   - **Notes** (optional)
+6. Click **Record Payment** to save
 
-### Exporting Data
+### Uploading Payment Evidence
 
-**Export to CSV:**
-1. Apply desired filters
-2. Click **Export CSV** button
-3. File downloads automatically
+After recording a payment:
 
-**Export to Excel:**
-1. Apply desired filters
-2. Click **Export Excel** button
-3. File downloads with formatting preserved
+1. In the application details modal, find **Payment Documents**
+2. Click the upload area or drag and drop a file
+3. Supported formats: PDF, JPG, PNG (max 5MB)
+4. File uploads automatically after selection
 
-**Export Options:**
-- All applications (no filter)
-- Filtered results only
-- Date range specific
+### Verifying or Rejecting Payments
 
-### Generating Monthly Reports
-
-1. Navigate to **Reports** tab
-2. Select the month and year
-3. Click **Generate Report**
-4. View summary statistics
-5. Export if needed
-
-### Filtering Applications
-
-**By Date Range:**
-1. Click date picker for "From" date
-2. Click date picker for "To" date
-3. Results update automatically
-
-**By Applicant Type:**
-1. Select from dropdown: Individual, Joint, or Corporate
-2. Results filter immediately
-
-**By Status:**
-1. Select status from dropdown
-2. View applications matching criteria
+1. Open application with **Paid** status
+2. Review payment details and evidence documents
+3. Click **Verify Payment** or **Reject Payment**
+4. Add verification notes (optional but recommended)
+5. Status updates immediately
 
 ---
 
-## Analytics Explained
+## Exporting Data
 
-### Application Trends Chart
+### Export to CSV
 
-Shows the number of applications over time.
+1. Apply desired filters (optional)
+2. Click **Export CSV** button
+3. File downloads with filtered data
+4. Opens in Excel, Google Sheets, etc.
 
-- **Blue line:** Daily application count
-- **Orange line:** 7-day moving average (smoothed trend)
-- **Hover:** View exact counts for any date
+### Export to Excel
 
-**Interpreting:**
-- Upward trend indicates growing interest
-- Spikes may correlate with bond offering announcements
-- Moving average smooths daily fluctuations
+1. Apply desired filters (optional)
+2. Click **Export Excel** button
+3. File includes:
+   - Summary sheet with totals
+   - Detailed applications list
+   - Formatted columns
 
-### Bond Value Distribution
+### DMO Report Export
 
-Displays how application amounts are distributed.
+1. Go to **DMO Reports** tab
+2. Select month and year
+3. Click **Export Excel**
+4. Report includes:
+   - Monthly summary
+   - Subscriber details
+   - Payment status breakdown
 
-**Bar Chart:**
-- X-axis: Amount ranges (e.g., 5K-10K, 10K-50K)
-- Y-axis: Number of applications
-- Color-coded by applicant type
+---
 
-**Pie Chart:**
-- Percentage breakdown by applicant type
-- Hover for exact percentages
+## Filtering Applications
 
-### Growth Metrics
+### By Date Range
 
-**Week-over-Week (WoW):**
-- Compares current week to previous week
-- Green: Growth
-- Red: Decline
-- Percentage change displayed
+1. Click "From" date picker
+2. Select start date
+3. Click "To" date picker
+4. Select end date
+5. Results filter automatically
 
-**Month-over-Month (MoM):**
-- Compares current month to previous month
-- Useful for longer-term trend analysis
+### By Value Range
+
+1. Enter minimum value (optional)
+2. Enter maximum value (optional)
+3. Results filter automatically
+
+### By Tenor
+
+1. Select from dropdown: "2-Year" or "3-Year"
+2. Results filter immediately
+
+### By Payment Status
+
+1. Select from dropdown:
+   - **Pending** - No payment recorded
+   - **Paid** - Payment recorded, not verified
+   - **Verified** - Payment confirmed
+   - **Rejected** - Payment rejected
+2. Results filter immediately
+
+### Clear Filters
+
+Click **Clear Filters** button to reset all filters
 
 ---
 
@@ -180,52 +214,33 @@ Displays how application amounts are distributed.
 
 ### Cannot Log In
 
-1. **Verify Username**
-   - Check `ADMIN_USERNAME` in `.env`
-   - Default is `admin`
+1. **Verify Credentials**
+   - Check `ADMIN_USERNAME` in `backend/.env`
+   - Check `ADMIN_PASSWORD_HASH` matches your password
 
-2. **Verify Password Hash**
-   - Generate hash of your password
-   - Compare with `ADMIN_PASSWORD_HASH` in `.env`
-
-3. **Clear Browser Data**
-   - Clear cookies for the admin URL
+2. **Clear Browser Data**
+   - Clear localStorage for the admin URL
    - Try incognito/private window
 
-4. **Check Logs**
+3. **Check Backend Logs**
    ```bash
-   docker-compose logs admin
+   docker-compose logs backend
    ```
 
 ### No Data Showing
 
-1. **Check Database Connection**
+1. **Check API Connection**
    ```bash
-   docker-compose logs mongodb
+   curl http://localhost/api/health
    ```
 
-2. **Verify Data Exists**
+2. **Verify Database**
    - Submit a test application via user form
    - Refresh admin dashboard
 
 3. **Check Filters**
-   - Ensure date range includes existing applications
    - Clear all filters to see all data
-
-### Charts Not Loading
-
-1. **Check Browser Console**
-   - Open Developer Tools (F12)
-   - Look for JavaScript errors
-
-2. **Verify Plotly Loaded**
-   - Charts require Plotly library
-   - Check network tab for failed requests
-
-3. **Restart Admin Service**
-   ```bash
-   docker-compose restart admin
-   ```
+   - Verify date range includes existing applications
 
 ### Export Not Working
 
@@ -234,8 +249,25 @@ Displays how application amounts are distributed.
    - Check default download location
 
 2. **File Size**
-   - Very large exports may time out
+   - Very large exports may be slow
    - Use filters to reduce data size
+
+3. **Check Console**
+   - Open Developer Tools (F12)
+   - Look for network errors
+
+### Payment Upload Failed
+
+1. **Check File Size**
+   - Maximum 5MB per file
+
+2. **Check File Type**
+   - Only PDF, JPG, PNG allowed
+
+3. **Check Backend Storage**
+   ```bash
+   docker exec fgnbond_sub-backend-1 ls -la /app/uploads/
+   ```
 
 ---
 
@@ -243,25 +275,13 @@ Displays how application amounts are distributed.
 
 To change your admin password:
 
-**macOS/Linux:**
 ```bash
-echo -n "YourNewPassword" | shasum -a 256 | cut -d' ' -f1
+python -c "import bcrypt; print(bcrypt.hashpw('YourNewPassword'.encode(), bcrypt.gensalt()).decode())"
 ```
 
-**Windows (PowerShell):**
-```powershell
-python -c "import hashlib; print(hashlib.sha256('YourNewPassword'.encode()).hexdigest())"
-```
-
-**Python:**
-```python
-import hashlib
-print(hashlib.sha256("YourNewPassword".encode()).hexdigest())
-```
-
-Then update `ADMIN_PASSWORD_HASH` in your `.env` file and restart:
+Then update `ADMIN_PASSWORD_HASH` in `backend/.env` and restart:
 ```bash
-docker-compose restart admin
+docker-compose restart backend
 ```
 
 ---
@@ -273,22 +293,29 @@ docker-compose restart admin
 | Frequency | Task |
 |-----------|------|
 | Daily | Review new applications |
-| Weekly | Export weekly report |
-| Monthly | Generate monthly summary |
-| Monthly | Archive/backup data |
+| Daily | Process pending payments |
+| Weekly | Verify recorded payments |
+| Monthly | Generate DMO report |
+| Monthly | Export and backup data |
+
+### Payment Processing
+
+- **Verify promptly** - Don't let payments sit in "Paid" status
+- **Add notes** - Document any issues or special circumstances
+- **Upload evidence** - Always attach payment proof
 
 ### Data Management
 
-- **Regular Exports:** Keep offline backups of application data
-- **Archiving:** Consider archiving old applications periodically
-- **Monitoring:** Watch for unusual patterns (fraud indicators)
+- **Regular Exports** - Keep offline backups of application data
+- **Filter before export** - Export only needed data
+- **Archive monthly** - Keep organized records by month
 
 ### Security
 
-- **Log Out:** Always log out when finished
-- **Password Rotation:** Change admin password periodically
-- **Access Review:** Regularly review who has admin access
-- **IP Restriction:** Consider IP whitelisting for admin access
+- **Log Out** - Always log out when finished
+- **Password Rotation** - Change admin password periodically
+- **Access Review** - Regularly review who has admin access
+- **Use HTTPS** - Always use secure connection in production
 
 ---
 
@@ -296,9 +323,8 @@ docker-compose restart admin
 
 | Shortcut | Action |
 |----------|--------|
-| `Ctrl+F` / `Cmd+F` | Search in current view |
 | `Escape` | Close modal/details |
-| `Enter` | Confirm action |
+| `Ctrl+F` / `Cmd+F` | Search in current view |
 
 ---
 
@@ -306,7 +332,7 @@ docker-compose restart admin
 
 For technical issues:
 1. Check [Troubleshooting](#troubleshooting) section
-2. Review application logs: `docker-compose logs admin`
+2. Review application logs: `docker-compose logs`
 3. Contact system administrator
 
 For feature requests or bugs, create an issue in the project repository.

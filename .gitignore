@@ -52,3 +52,12 @@ logs/
 # OS specific
 .DS_Store
 Thumbs.db
+
+# Archive (old Streamlit app reference)
+.ignore/
+
+# Playwright test artifacts
+.playwright-mcp/
+
+# Best practices docs (reference only)
+docs/best-practices-docs/

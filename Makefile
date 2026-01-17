@@ -8,28 +8,29 @@
 # Usage: make <target>
 #
 # Quick Start:
-#   make setup    - First-time setup (copy .env, build images)
-#   make up       - Start all services
+#   make setup    - First-time setup
+#   make up       - Start all services (Docker)
+#   make dev      - Start local development servers
 #   make down     - Stop all services
-#   make logs     - View logs
 #
 # ==============================================================================
 
 .PHONY: help setup up down restart logs build clean \
-        up-prod down-prod logs-prod \
-        dev dev-web dev-admin \
-        test lint security-scan \
-        db-shell db-backup db-restore \
-        shell-web shell-admin \
-        status health ps
+        dev dev-backend dev-frontend \
+        test test-backend test-frontend \
+        test-docker test-docker-backend test-docker-frontend test-docker-frontend-build \
+        test-coverage lint lint-fix \
+        shell-backend shell-frontend \
+        db-backup db-restore \
+        status health ps info hash secret
 
 # Default target
 .DEFAULT_GOAL := help
 
 # Variables
 COMPOSE_FILE := docker-compose.yml
-COMPOSE_PROD_FILE := docker-compose.prod.yml
-IMAGE_NAME := fgn-bond-app
+BACKEND_DIR := backend
+FRONTEND_DIR := frontend
 BACKUP_DIR := ./backups
 
 # Colors for output
@@ -49,51 +50,60 @@ help: ## Show this help message
 	@echo "$(BLUE)=============================$(NC)"
 	@echo ""
 	@echo "$(GREEN)Quick Start:$(NC)"
-	@echo "  make setup     - First-time setup"
-	@echo "  make up        - Start all services"
-	@echo "  make down      - Stop all services"
+	@echo "  make setup        - First-time setup"
+	@echo "  make up           - Start Docker services"
+	@echo "  make dev          - Start local development"
+	@echo "  make down         - Stop all services"
 	@echo ""
 	@echo "$(GREEN)Available targets:$(NC)"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(BLUE)%-15s$(NC) %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(BLUE)%-18s$(NC) %s\n", $$1, $$2}'
 	@echo ""
 
 # ==============================================================================
 # SETUP & CONFIGURATION
 # ==============================================================================
 
-setup: ## First-time setup: copy .env and build images
+setup: ## First-time setup: install deps, create env, build images
 	@echo "$(BLUE)Setting up FGN Bond Application...$(NC)"
-	@if [ ! -f .env ]; then \
-		cp .env.example .env; \
-		echo "$(GREEN)Created .env from .env.example$(NC)"; \
-		echo "$(YELLOW)Please review and update .env with your settings$(NC)"; \
-	else \
-		echo "$(YELLOW).env already exists, skipping$(NC)"; \
+	@# Backend setup
+	@if [ ! -f $(BACKEND_DIR)/.env ]; then \
+		cp $(BACKEND_DIR)/.env.example $(BACKEND_DIR)/.env 2>/dev/null || \
+		echo "$(YELLOW)Create $(BACKEND_DIR)/.env from .env.example$(NC)"; \
 	fi
+	@mkdir -p $(BACKEND_DIR)/data $(BACKEND_DIR)/logs
+	@# Frontend setup
+	@if [ -d $(FRONTEND_DIR) ] && [ ! -d $(FRONTEND_DIR)/node_modules ]; then \
+		echo "$(BLUE)Installing frontend dependencies...$(NC)"; \
+		cd $(FRONTEND_DIR) && npm install; \
+	fi
+	@# Build Docker images
 	@$(MAKE) build
 	@echo ""
 	@echo "$(GREEN)Setup complete!$(NC)"
-	@echo "Run 'make up' to start the application"
+	@echo "Run 'make up' for Docker or 'make dev' for local development"
 
-env: ## Create .env from .env.example if not exists
-	@if [ ! -f .env ]; then \
-		cp .env.example .env; \
-		echo "$(GREEN)Created .env from .env.example$(NC)"; \
+env: ## Create .env files from examples
+	@if [ ! -f $(BACKEND_DIR)/.env ]; then \
+		cp $(BACKEND_DIR)/.env.example $(BACKEND_DIR)/.env; \
+		echo "$(GREEN)Created $(BACKEND_DIR)/.env$(NC)"; \
 	else \
-		echo "$(YELLOW).env already exists$(NC)"; \
+		echo "$(YELLOW)$(BACKEND_DIR)/.env already exists$(NC)"; \
 	fi
 
 # ==============================================================================
-# DOCKER COMPOSE - DEVELOPMENT
+# DOCKER COMPOSE
 # ==============================================================================
 
-up: ## Start all services (development)
+up: ## Start all services (Docker)
 	@echo "$(BLUE)Starting services...$(NC)"
 	docker-compose -f $(COMPOSE_FILE) up -d
 	@echo ""
 	@echo "$(GREEN)Services started!$(NC)"
-	@echo "  User App:  http://localhost"
-	@echo "  Admin:     http://localhost:8080"
+	@echo "  App:      http://localhost"
+	@echo "  Admin:    http://localhost/admin"
+	@echo "  API:      http://localhost/api"
+	@echo "  API Docs: http://localhost/api/docs"
+	@sleep 3
 	@$(MAKE) health
 
 down: ## Stop all services
@@ -119,65 +129,50 @@ rebuild: ## Rebuild Docker images (no cache)
 logs: ## View logs (all services)
 	docker-compose -f $(COMPOSE_FILE) logs -f
 
-logs-web: ## View web app logs
-	docker-compose -f $(COMPOSE_FILE) logs -f web
+logs-backend: ## View backend logs
+	docker-compose -f $(COMPOSE_FILE) logs -f backend
 
-logs-admin: ## View admin app logs
-	docker-compose -f $(COMPOSE_FILE) logs -f admin
+logs-frontend: ## View frontend logs
+	docker-compose -f $(COMPOSE_FILE) logs -f frontend
 
-logs-db: ## View MongoDB logs
-	docker-compose -f $(COMPOSE_FILE) logs -f mongodb
-
-logs-nginx: ## View Nginx logs
+logs-nginx: ## View nginx logs
 	docker-compose -f $(COMPOSE_FILE) logs -f nginx
 
 # ==============================================================================
-# DOCKER COMPOSE - PRODUCTION
+# LOCAL DEVELOPMENT
 # ==============================================================================
 
-up-prod: ## Start all services (production)
-	@echo "$(BLUE)Starting production services...$(NC)"
-	docker-compose -f $(COMPOSE_PROD_FILE) up -d
-	@echo "$(GREEN)Production services started$(NC)"
-	@$(MAKE) health-prod
+dev: ## Start local development (backend + frontend)
+	@echo "$(BLUE)Starting local development servers...$(NC)"
+	@echo "Backend:  http://localhost:8000"
+	@echo "Frontend: http://localhost:5173"
+	@echo ""
+	@$(MAKE) -j2 dev-backend dev-frontend
 
-down-prod: ## Stop production services
-	@echo "$(BLUE)Stopping production services...$(NC)"
-	docker-compose -f $(COMPOSE_PROD_FILE) down
-	@echo "$(GREEN)Production services stopped$(NC)"
+dev-backend: ## Start backend development server
+	@echo "$(BLUE)Starting backend...$(NC)"
+	@cd $(BACKEND_DIR) && \
+		if [ ! -d venv ]; then python3.12 -m venv venv; fi && \
+		. venv/bin/activate && \
+		pip install -q -r requirements.txt && \
+		uvicorn app.main:app --reload --port 8000
 
-logs-prod: ## View production logs
-	docker-compose -f $(COMPOSE_PROD_FILE) logs -f
+dev-frontend: ## Start frontend development server
+	@echo "$(BLUE)Starting frontend...$(NC)"
+	@cd $(FRONTEND_DIR) && npm run dev
 
-build-prod: ## Build production images
-	@echo "$(BLUE)Building production images...$(NC)"
-	docker-compose -f $(COMPOSE_PROD_FILE) build
-	@echo "$(GREEN)Production build complete$(NC)"
+install-backend: ## Install backend dependencies
+	@echo "$(BLUE)Installing backend dependencies...$(NC)"
+	@cd $(BACKEND_DIR) && \
+		if [ ! -d venv ]; then python3.12 -m venv venv; fi && \
+		. venv/bin/activate && \
+		pip install -r requirements.txt
+	@echo "$(GREEN)Backend dependencies installed$(NC)"
 
-# ==============================================================================
-# LOCAL DEVELOPMENT (without Docker)
-# ==============================================================================
-
-dev: ## Run both apps locally (requires MongoDB)
-	@echo "$(YELLOW)Starting local development servers...$(NC)"
-	@echo "Make sure MongoDB is running on localhost:27017"
-	@$(MAKE) dev-web &
-	@$(MAKE) dev-admin &
-	@wait
-
-dev-web: ## Run user app locally
-	streamlit run src/streamlit_app.py --server.port=8501
-
-dev-admin: ## Run admin app locally
-	streamlit run src/admin_app.py --server.port=8502
-
-install: ## Install Python dependencies
-	pip install -r requirements.txt
-
-venv: ## Create virtual environment
-	python -m venv venv
-	@echo "$(GREEN)Virtual environment created$(NC)"
-	@echo "Activate with: source venv/bin/activate"
+install-frontend: ## Install frontend dependencies
+	@echo "$(BLUE)Installing frontend dependencies...$(NC)"
+	@cd $(FRONTEND_DIR) && npm install
+	@echo "$(GREEN)Frontend dependencies installed$(NC)"
 
 # ==============================================================================
 # STATUS & HEALTH
@@ -191,79 +186,113 @@ status: ps ## Alias for ps
 health: ## Check health of all services
 	@echo "$(BLUE)Checking service health...$(NC)"
 	@echo ""
-	@sleep 2
-	@echo "Web App:  $$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8501/_stcore/health 2>/dev/null || echo 'DOWN')"
-	@echo "Admin:    $$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8502/_stcore/health 2>/dev/null || echo 'DOWN')"
-	@echo "Nginx:    $$(curl -s -o /dev/null -w '%{http_code}' http://localhost/ 2>/dev/null || echo 'DOWN')"
+	@printf "Backend:  "
+	@curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/health 2>/dev/null || echo "DOWN"
+	@echo ""
+	@printf "Frontend: "
+	@curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/ 2>/dev/null || echo "DOWN"
+	@echo ""
+	@printf "Nginx:    "
+	@curl -s -o /dev/null -w '%{http_code}' http://localhost/ 2>/dev/null || echo "DOWN"
 	@echo ""
 
-health-prod: ## Check health of production services
-	@echo "$(BLUE)Checking production health...$(NC)"
-	@docker-compose -f $(COMPOSE_PROD_FILE) ps
+# ==============================================================================
+# TESTING
+# ==============================================================================
+
+test: test-backend test-frontend ## Run all tests (local)
+
+test-backend: ## Run backend tests (local)
+	@echo "$(BLUE)Running backend tests...$(NC)"
+	@cd $(BACKEND_DIR) && \
+		. venv/bin/activate 2>/dev/null || true && \
+		pytest tests/ -v
+
+test-frontend: ## Run frontend tests (local)
+	@echo "$(BLUE)Running frontend tests...$(NC)"
+	@cd $(FRONTEND_DIR) && npm run test:run
+
+test-docker: test-docker-backend test-docker-frontend ## Run all tests (Docker)
+
+test-docker-backend: ## Run backend tests via Docker
+	@echo "$(BLUE)Running backend tests (Docker)...$(NC)"
+	docker-compose run --rm backend pytest tests/ -v
+	@echo "$(GREEN)Backend tests complete$(NC)"
+
+test-docker-frontend: ## Run frontend tests via Docker
+	@echo "$(BLUE)Running frontend tests (Docker)...$(NC)"
+	docker-compose --profile test run --rm frontend-test
+	@echo "$(GREEN)Frontend tests complete$(NC)"
+
+test-docker-frontend-build: ## Build frontend test image
+	@echo "$(BLUE)Building frontend test image...$(NC)"
+	docker-compose --profile test build frontend-test
+	@echo "$(GREEN)Frontend test image built$(NC)"
+
+test-coverage: ## Run tests with coverage (local)
+	@echo "$(BLUE)Running tests with coverage...$(NC)"
+	@cd $(BACKEND_DIR) && \
+		. venv/bin/activate 2>/dev/null || true && \
+		pytest tests/ -v --cov=app --cov-report=html --cov-report=term-missing
+	@cd $(FRONTEND_DIR) && npm run test:coverage
+	@echo "$(GREEN)Coverage reports generated$(NC)"
+	@echo "  Backend:  $(BACKEND_DIR)/htmlcov/index.html"
+	@echo "  Frontend: $(FRONTEND_DIR)/coverage/index.html"
+
+lint: ## Run linting checks
+	@echo "$(BLUE)Running linting...$(NC)"
+	@cd $(BACKEND_DIR) && \
+		. venv/bin/activate 2>/dev/null || true && \
+		pip install -q flake8 black isort && \
+		flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics && \
+		black --check app/ && \
+		isort --check-only --profile black app/
+	@cd $(FRONTEND_DIR) && npm run lint
+	@echo "$(GREEN)Linting complete$(NC)"
+
+lint-fix: ## Fix linting issues automatically
+	@echo "$(BLUE)Fixing linting issues...$(NC)"
+	@cd $(BACKEND_DIR) && \
+		. venv/bin/activate 2>/dev/null || true && \
+		pip install -q black isort && \
+		black app/ && \
+		isort --profile black app/
+	@cd $(FRONTEND_DIR) && npm run format 2>/dev/null || npm run lint -- --fix 2>/dev/null || true
+	@echo "$(GREEN)Linting fixes applied$(NC)"
 
 # ==============================================================================
 # DATABASE
 # ==============================================================================
 
-db-shell: ## Open MongoDB shell
-	docker-compose -f $(COMPOSE_FILE) exec mongodb mongosh -u admin -p password --authenticationDatabase admin
-
-db-backup: ## Backup MongoDB database
+db-backup: ## Backup SQLite database
 	@mkdir -p $(BACKUP_DIR)
 	@TIMESTAMP=$$(date +%Y%m%d_%H%M%S); \
-	docker-compose -f $(COMPOSE_FILE) exec -T mongodb mongodump \
-		-u admin -p password --authenticationDatabase admin \
-		--db fgn_bonds --archive > $(BACKUP_DIR)/backup_$$TIMESTAMP.archive; \
-	echo "$(GREEN)Backup created: $(BACKUP_DIR)/backup_$$TIMESTAMP.archive$(NC)"
+	cp $(BACKEND_DIR)/data/fgn_bonds.db $(BACKUP_DIR)/fgn_bonds_$$TIMESTAMP.db 2>/dev/null && \
+	echo "$(GREEN)Backup created: $(BACKUP_DIR)/fgn_bonds_$$TIMESTAMP.db$(NC)" || \
+	echo "$(RED)No database file found$(NC)"
 
-db-restore: ## Restore MongoDB from latest backup
-	@LATEST=$$(ls -t $(BACKUP_DIR)/backup_*.archive 2>/dev/null | head -1); \
+db-restore: ## Restore SQLite from latest backup
+	@LATEST=$$(ls -t $(BACKUP_DIR)/fgn_bonds_*.db 2>/dev/null | head -1); \
 	if [ -z "$$LATEST" ]; then \
 		echo "$(RED)No backup files found in $(BACKUP_DIR)$(NC)"; \
 		exit 1; \
 	fi; \
 	echo "$(BLUE)Restoring from: $$LATEST$(NC)"; \
-	docker-compose -f $(COMPOSE_FILE) exec -T mongodb mongorestore \
-		-u admin -p password --authenticationDatabase admin \
-		--archive < $$LATEST; \
+	cp "$$LATEST" $(BACKEND_DIR)/data/fgn_bonds.db; \
 	echo "$(GREEN)Restore complete$(NC)"
 
 # ==============================================================================
 # SHELL ACCESS
 # ==============================================================================
 
-shell-web: ## Open shell in web container
-	docker-compose -f $(COMPOSE_FILE) exec web /bin/bash
+shell-backend: ## Open shell in backend container
+	docker-compose -f $(COMPOSE_FILE) exec backend /bin/bash
 
-shell-admin: ## Open shell in admin container
-	docker-compose -f $(COMPOSE_FILE) exec admin /bin/bash
+shell-frontend: ## Open shell in frontend container
+	docker-compose -f $(COMPOSE_FILE) exec frontend /bin/sh
 
 shell-nginx: ## Open shell in nginx container
 	docker-compose -f $(COMPOSE_FILE) exec nginx /bin/sh
-
-# ==============================================================================
-# TESTING & LINTING
-# ==============================================================================
-
-lint: ## Run linting checks
-	@echo "$(BLUE)Running linting...$(NC)"
-	@pip install flake8 -q
-	flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
-	@echo "$(GREEN)Linting passed$(NC)"
-
-lint-full: ## Run full linting (includes style)
-	@echo "$(BLUE)Running full linting...$(NC)"
-	@pip install flake8 -q
-	flake8 src/ --count --max-complexity=10 --max-line-length=127 --statistics
-
-test: ## Run tests (placeholder)
-	@echo "$(YELLOW)No tests configured yet$(NC)"
-	@echo "Add tests to tests/ directory"
-
-security-scan: ## Run security scan on Docker image
-	@echo "$(BLUE)Scanning for vulnerabilities...$(NC)"
-	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-		aquasec/trivy image $(IMAGE_NAME):latest
 
 # ==============================================================================
 # CLEANUP
@@ -280,6 +309,9 @@ clean-images: ## Remove Docker images
 	@echo "$(GREEN)Images removed$(NC)"
 
 clean-all: clean clean-images ## Full cleanup (containers, volumes, images)
+	@rm -rf $(FRONTEND_DIR)/node_modules
+	@rm -rf $(BACKEND_DIR)/venv
+	@rm -rf $(BACKEND_DIR)/__pycache__
 	@echo "$(GREEN)Full cleanup complete$(NC)"
 
 prune: ## Prune unused Docker resources
@@ -291,27 +323,25 @@ prune: ## Prune unused Docker resources
 # UTILITIES
 # ==============================================================================
 
-hash: ## Generate password hash (usage: make hash PASS=yourpassword)
+hash: ## Generate bcrypt password hash (usage: make hash PASS=yourpassword)
 	@if [ -z "$(PASS)" ]; then \
 		echo "$(RED)Usage: make hash PASS=yourpassword$(NC)"; \
 		exit 1; \
 	fi
-	@echo "$(BLUE)SHA-256 hash for '$(PASS)':$(NC)"
-	@echo -n "$(PASS)" | shasum -a 256 | cut -d' ' -f1
+	@echo "$(BLUE)bcrypt hash for '$(PASS)':$(NC)"
+	@python3 -c "import bcrypt; print(bcrypt.hashpw('$(PASS)'.encode(), bcrypt.gensalt()).decode())"
 
 secret: ## Generate random secret key
-	@echo "$(BLUE)Generated SECRET_KEY:$(NC)"
-	@python -c "import secrets; print(secrets.token_hex(32))"
+	@echo "$(BLUE)Generated JWT_SECRET_KEY:$(NC)"
+	@python3 -c "import secrets; print(secrets.token_hex(32))"
 
 password: ## Generate random password
 	@echo "$(BLUE)Generated password:$(NC)"
 	@openssl rand -base64 24
 
-validate: ## Validate docker-compose files
+validate: ## Validate docker-compose file
 	@echo "$(BLUE)Validating docker-compose.yml...$(NC)"
 	@docker-compose -f $(COMPOSE_FILE) config -q && echo "$(GREEN)Valid$(NC)"
-	@echo "$(BLUE)Validating docker-compose.prod.yml...$(NC)"
-	@docker-compose -f $(COMPOSE_PROD_FILE) config -q && echo "$(GREEN)Valid$(NC)"
 
 # ==============================================================================
 # INFO
@@ -322,18 +352,23 @@ info: ## Show project information
 	@echo "$(BLUE)FGN Savings Bond Application$(NC)"
 	@echo "=============================="
 	@echo ""
-	@echo "$(GREEN)Services:$(NC)"
-	@echo "  - Nginx (reverse proxy)"
-	@echo "  - Web App (user form)"
-	@echo "  - Admin Dashboard"
-	@echo "  - MongoDB"
+	@echo "$(GREEN)Architecture:$(NC)"
+	@echo "  - Frontend: React + TypeScript + Tailwind"
+	@echo "  - Backend:  FastAPI + SQLAlchemy + SQLite"
+	@echo "  - Proxy:    Nginx"
 	@echo ""
-	@echo "$(GREEN)URLs:$(NC)"
-	@echo "  - User App:  http://localhost"
-	@echo "  - Admin:     http://localhost:8080"
+	@echo "$(GREEN)URLs (Docker):$(NC)"
+	@echo "  - App:      http://localhost"
+	@echo "  - Admin:    http://localhost/admin"
+	@echo "  - API:      http://localhost/api"
+	@echo "  - API Docs: http://localhost/api/docs"
 	@echo ""
-	@echo "$(GREEN)Documentation:$(NC)"
-	@echo "  - README.md"
-	@echo "  - docs/SECURITY.md"
-	@echo "  - docs/ADMIN_GUIDE.md"
+	@echo "$(GREEN)URLs (Local Dev):$(NC)"
+	@echo "  - Frontend: http://localhost:5173"
+	@echo "  - Backend:  http://localhost:8000"
+	@echo "  - API Docs: http://localhost:8000/docs"
+	@echo ""
+	@echo "$(GREEN)Default Admin:$(NC)"
+	@echo "  - Username: admin"
+	@echo "  - Password: admin123"
 	@echo ""

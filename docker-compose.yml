@@ -1,39 +1,35 @@
 # FGN Savings Bond Application - Docker Compose
-# Development configuration with health checks and resource limits
+# React + FastAPI architecture with SQLite database
 #
 # Usage:
 #   docker-compose up -d          # Start all services
 #   docker-compose ps             # Check service status
-#   docker-compose logs -f web    # View web app logs
+#   docker-compose logs -f        # View all logs
 #   docker-compose down           # Stop all services
 #
 # Access Points (via Nginx):
-#   - User App:  http://localhost        (port 80)
-#   - Admin:     http://localhost:8080   (port 8080)
+#   - User Form:    http://localhost        (port 80)
+#   - Admin:        http://localhost/admin
+#   - API:          http://localhost/api
 #
 # Direct Access (bypass Nginx):
-#   - User App:  http://localhost:8501
-#   - Admin:     http://localhost:8502
-#
-# For production, use: docker-compose -f docker-compose.prod.yml up -d
-
-version: '3.8'
+#   - Frontend:     http://localhost:3000
+#   - Backend API:  http://localhost:8000
 
 services:
   # ==========================================================================
   # Nginx Reverse Proxy
-  # Entry point for all HTTP traffic with WebSocket support
+  # Entry point for all HTTP traffic, routes to frontend and backend
   # ==========================================================================
   nginx:
     image: nginx:alpine
     ports:
-      - "80:80"      # Main app
-      - "8080:8080"  # Admin dashboard
+      - "80:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
-      - web
-      - admin
+      - frontend
+      - backend
     networks:
       - fgn_network
     restart: unless-stopped
@@ -45,99 +41,70 @@ services:
       start_period: 10s
 
   # ==========================================================================
-  # Main user-facing bond subscription form
-  # Access at: http://localhost (via Nginx) or http://localhost:8501 (direct)
+  # React Frontend (Production)
+  # User-facing bond subscription form and admin dashboard
   # ==========================================================================
-  web:
+  frontend:
     build:
-      context: .
-      args:
-        PORT: 8501
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
     ports:
-      - "8501:8501"
-    env_file:
-      - .env
+      - "3000:80"
     depends_on:
-      mongodb:
-        condition: service_healthy
+      - backend
     networks:
       - fgn_network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 256M
 
   # ==========================================================================
-  # Admin dashboard (password protected)
-  # Access at: http://localhost:8502
-  # Default credentials: admin / admin123 (CHANGE FOR PRODUCTION!)
+  # Frontend Test Runner
+  # Run with: docker-compose --profile test run --rm frontend-test
   # ==========================================================================
-  admin:
+  frontend-test:
     build:
-      context: .
-      args:
-        PORT: 8502
-    ports:
-      - "8502:8502"
-    env_file:
-      - .env
-    depends_on:
-      mongodb:
-        condition: service_healthy
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: test
+    profiles:
+      - test
     networks:
       - fgn_network
-    command: sh -c "streamlit run src/admin_app.py --server.port=8502 --server.address=0.0.0.0"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8502/_stcore/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 256M
 
   # ==========================================================================
-  # MongoDB database
-  # Data persisted in mongodb_data volume
+  # FastAPI Backend
+  # REST API for form submission, PDF generation, and admin features
   # ==========================================================================
-  mongodb:
-    image: mongo:7.0  # Pinned version for reproducibility
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+      # Override password hash ($ must be escaped as $$ in docker-compose.yml)
+      - ADMIN_PASSWORD_HASH=$$2b$$12$$TdQ.V0Ryh1Va2Bxzkr6JfuSSSTvxQsGOu7sOXaLwU8KJBx9apGHTK
+    volumes:
+      - ./backend/data:/app/data          # SQLite database
+      - ./backend/logs:/app/logs          # Application logs
+      - ./backend/uploads:/app/uploads    # Payment evidence uploads
     networks:
       - fgn_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
-      retries: 5
-      start_period: 30s
+      retries: 3
+      start_period: 40s
     deploy:
       resources:
         limits:
-          memory: 1G
-        reservations:
           memory: 512M
+        reservations:
+          memory: 256M
 
 # ==========================================================================
 # Networks
@@ -145,10 +112,3 @@ services:
 networks:
   fgn_network:
     driver: bridge
-
-# ==========================================================================
-# Volumes
-# ==========================================================================
-volumes:
-  mongodb_data:
-    name: fgn_mongodb_data
