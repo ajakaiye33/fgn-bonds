@@ -112,24 +112,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Validate docker-compose.yml
-        run: docker-compose config -q
+      - name: Validate docker compose.yml
+        run: docker compose config -q
 
       - name: Build production images
-        run: docker-compose build
+        run: docker compose build
 
       - name: Build test images
-        run: docker-compose --profile test build
+        run: docker compose --profile test build
 
       - name: Run backend tests (Docker)
-        run: docker-compose run --rm backend pytest tests/ -v
+        run: docker compose run --rm backend pytest tests/ -v
 
       - name: Run frontend tests (Docker)
-        run: docker-compose --profile test run --rm frontend-test
+        run: docker compose --profile test run --rm frontend-test
 
       - name: Start production services
         run: |
-          docker-compose up -d
+          docker compose up -d
           sleep 15
 
       - name: Health check
@@ -142,4 +142,4 @@ jobs:
           echo "Frontend is healthy"
 
       - name: Stop services
-        run: docker-compose down
+        run: docker compose down
