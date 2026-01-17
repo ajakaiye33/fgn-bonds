@@ -1,5 +1,7 @@
 # FGN Savings Bond Subscription Application
 
+[![CI](https://github.com/ajakaiye33/fgn-bonds/actions/workflows/ci.yml/badge.svg)](https://github.com/ajakaiye33/fgn-bonds/actions/workflows/ci.yml)
+
 A modern web application for submitting Federal Government of Nigeria (FGN) Savings Bond applications. Built with React + FastAPI, featuring a 7-step form wizard, PDF generation, payment tracking, and DMO reporting.
 
 ## Table of Contents
