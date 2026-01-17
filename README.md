@@ -19,6 +19,7 @@ A modern web application for submitting Federal Government of Nigeria (FGN) Savi
 - [Docker Architecture](#docker-architecture)
 - [Troubleshooting](#troubleshooting)
 - [Production Deployment](#production-deployment)
+- [Support the Project](#support-the-project)
 
 ---
 
@@ -601,6 +602,14 @@ This project is licensed under the MIT License.
 ## Author
 
 **Hedgar Ajakaiye**
+
+---
+
+## Support the Project
+
+If you find this project helpful, consider buying me a coffee!
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/ajakaiye33)
 
 ---
 
